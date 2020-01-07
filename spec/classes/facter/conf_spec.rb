@@ -1,9 +1,8 @@
 require 'spec_helper'
 
-# We have to test pupmod::facter::conf via pupmod, because pupmod::facter::conf
-# is private.  To take advantage of hooks built into puppet-rspec, the class
-# described needs to be the class instantiated, i.e., pupmod. Then, to adjust the
-# private class's parameters, we will use hieradata.
+# Test pupmod::facter::conf via pupmod, because pupmod::facter::conf is private.
+# To take advantage of hooks built into puppet-rspec, the class described needs
+# to be the class instantiated, i.e., pupmod.
 describe 'pupmod' do
   on_supported_os.each do |os, os_facts|
     context "on #{os}" do
@@ -11,9 +10,9 @@ describe 'pupmod' do
 
       let(:conf_dir) { '/etc/puppetlabs/facter' }
       let(:conf_file) { '/etc/puppetlabs/facter/facter.conf' }
-      let(:params) { { :manage_facter_conf => true }}
 
       context 'with default facter config (empty sections)' do
+        let(:params) { { :manage_facter_conf => true }}
         it { is_expected.to compile.with_all_deps }
         it { is_expected.to contain_file(conf_dir).with_ensure('directory') }
         it { is_expected.to contain_file(conf_file).with_ensure('file') }
@@ -27,8 +26,6 @@ describe 'pupmod' do
       end
 
       context 'with fully specified facter config' do
-        let(:hieradata) { 'facter_config' }
-
         let(:facts_section) { {
           'blocklist' => [ 'EC2' ],
           'ttls'      => [
@@ -51,6 +48,16 @@ describe 'pupmod' do
           'verbose'   => false,
           'log-level' => 'warn'
         } }
+
+        let(:params) { {
+          :manage_facter_conf => true,
+          :facter_options     => {
+            'facts'  => facts_section,
+            'global' => global_section,
+            'cli'    => cli_section
+          }
+        } }
+
 
         it { is_expected.to compile.with_all_deps }
         it { is_expected.to contain_file(conf_dir).with_ensure('directory') }

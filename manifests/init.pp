@@ -371,7 +371,7 @@ class pupmod (
     }
 
     if $manage_facter_conf {
-       include 'pupmod::facter::conf'
+      include 'pupmod::facter::conf'
     }
   }
 }

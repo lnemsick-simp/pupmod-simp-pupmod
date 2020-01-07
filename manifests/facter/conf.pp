@@ -13,19 +13,19 @@ class pupmod::facter::conf (
   assert_private()
 
   file { $facter_conf_dir:
-    ensure  => 'directory',
-    owner   => 'root',
-    group   => 'root',
-    mode    => '0755'
+    ensure => 'directory',
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0755'
   }
 
   $_facter_conf = "${facter_conf_dir}/facter.conf"
 
   file {$_facter_conf:
-    ensure  => 'file',
-    owner   => 'root',
-    group   => 'root',
-    mode    => '0644'
+    ensure => 'file',
+    owner  => 'root',
+    group  => 'root',
+    mode   => '0644'
   }
 
   $facter_options.each |String $section, Hash $config| {

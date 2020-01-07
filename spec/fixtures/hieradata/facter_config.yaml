@@ -1,0 +1,19 @@
+---
+pupmod::facter_options:
+  facts:
+    blocklist:
+      - "EC2"
+    ttls:
+      - processor: "30 days"
+      - timezone: "8 hours"
+  global:
+    external-dir:     [ "path1", "path2" ]
+    custom-dir:       [ "custom/path" ]
+    no-exernal-facts: false
+    no-custom-facts:  false
+    no-ruby:          false
+  cli:
+    debug:     false
+    trace:     true
+    verbose:   false
+    log-level: "warn"

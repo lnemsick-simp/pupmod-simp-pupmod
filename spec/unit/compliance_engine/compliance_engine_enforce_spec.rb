@@ -4,14 +4,53 @@ require 'spec_helper'
 v1_profiles = './spec/fixtures/modules/compliance_markup/data/compliance_profiles'
 FileUtils.rm_rf(v1_profiles) if File.directory?(v1_profiles)
 
+# Remove any known exceptions from the section of the compliance report
+# @param compliance_profile_data  Original compliance report
+# @param section  Section of the compliance report to normalize
+# @param exceptions  Hash of exceptions to apply
+#   - Each key is a section name and its value is a structure containing
+#     list/hash of exceptions
+#   - The exceptions for 'documented_missing_parameters' and
+#     'documented_missing_resources' are arrays of strings/regexes to match.
+#   - The exceptions for 'non_compliant' is a Hash in which the key is the
+#     resource and the value is an array of parameter names.
+def normalize_compliance_results(compliance_profile_data, section, exceptions)
+  normalized = Marshal.load(Marshal.dump(compliance_profile_data))
+  if section == 'non_compliant'
+    exceptions['non_compliant'].each do |resource,params|
+      params.each do |param|
+        if normalized['non_compliant'].key?(resource) &&
+            normalized['non_compliant'][resource]['parameters'].key?(param)
+          normalized['non_compliant'][resource]['parameters'].delete(param)
+          if normalized['non_compliant'][resource]['parameters'].empty?
+            normalized['non_compliant'].delete(resource)
+          end
+        end
+      end
+    end
+  else
+    normalized[section].delete_if do |item|
+      rm = false
+      Array(exceptions[section]).each do |allowed|
+        if allowed.is_a?(Regexp)
+          if allowed.match?(item)
+            rm = true
+            break
+          end
+        else
+          rm = (allowed == item)
+        end
+      end
+      rm
+    end
+  end
+
+  normalized
+end
+
 # This is the class that needs to be added to the catalog last to make the
 # reporting work.
 describe 'compliance_markup', type: :class do
-
-  compliance_profiles = [
-    'disa_stig',
-    'nist_800_53:rev4'
-  ]
 
   # A list of classes that we expect to be included for compliance
   #
@@ -22,16 +61,40 @@ describe 'compliance_markup', type: :class do
     'pupmod::master'
   ]
 
-  allowed_failures = {
-    'documented_missing_parameters' => [
-    ] + expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
-    'documented_missing_resources' => [
-    ] + expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")}
+  compliance_profiles = {
+    'disa_stig'        => {
+      :percent_compliant   => 100,
+      :exceptions => {
+        'documented_missing_parameters' => [] +
+          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
+        'documented_missing_resources'  => [] +
+          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
+        'non_compliant'                 => {}
+      }
+    },
+    'nist_800_53:rev4' => {
+      :percent_compliant   => 99,
+      :exceptions => {
+        'documented_missing_parameters' => [] +
+          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
+        'documented_missing_resources'  => [] +
+          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
+        'non_compliant'                 => {
+           # compliance_engine is not smart enough, yet, to allow compliance to
+           # be determined by anything other than an exact match to parameter
+           # content. In this case, all we want to ensure is that 'EC2' appears
+           # in facts.blocklist element of pupmod::facter_options. We don't
+           # actually care what else is in that configuration Hash.  So, the
+           # 'non_compliant' report is a false alarm for pupmod::facter_options.
+          'Class[Pupmod]' => [ 'facter_options' ]
+        }
+      }
+    }
   }
 
   on_supported_os.each do |os, os_facts|
     context "on #{os}" do
-      compliance_profiles.each do |target_profile|
+      compliance_profiles.each do |target_profile,info|
         context "with compliance profile '#{target_profile}'" do
           let(:facts){
             os_facts.merge({
@@ -65,8 +128,9 @@ describe 'compliance_markup', type: :class do
             expect(compliance_profile_data).to_not be_nil
           end
 
-          it 'should have a 100% compliant report' do
-            expect(compliance_profile_data['summary']['percent_compliant']).to eq(100)
+          it "should have a #{info[:percent_compliant]}% compliant report" do
+            expect(compliance_profile_data['summary']['percent_compliant'])
+              .to eq(info[:percent_compliant])
           end
 
           # The list of report sections that should not exist and if they do
@@ -91,25 +155,13 @@ describe 'compliance_markup', type: :class do
           report_validators.each do |report_section|
             it "should have no issues with the '#{report_section}' report" do
               if compliance_profile_data[report_section]
-                # This just gets us a good print out of what went wrong
-                  compliance_profile_data[report_section].delete_if{ |item|
-                    rm = false
+                # remove any false alarms from compliance results
+                normalized = normalize_compliance_results(
+                  compliance_profile_data,
+                  report_section,
+                  info[:exceptions])
 
-                    Array(allowed_failures[report_section]).each do |allowed|
-                      if allowed.is_a?(Regexp)
-                        if allowed.match?(item)
-                          rm = true
-                          break
-                        end
-                      else
-                        rm = (allowed == item)
-                      end
-                    end
-
-                    rm
-                  }
-
-                expect(compliance_profile_data[report_section]).to eq([])
+                expect(normalized[report_section]).to be_empty
               end
             end
           end

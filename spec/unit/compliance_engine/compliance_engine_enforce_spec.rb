@@ -4,7 +4,8 @@ require 'spec_helper'
 v1_profiles = './spec/fixtures/modules/compliance_markup/data/compliance_profiles'
 FileUtils.rm_rf(v1_profiles) if File.directory?(v1_profiles)
 
-# Remove any known exceptions from the section of the compliance report
+# Remove any known exceptions from the specified section of the compliance report
+#
 # @param compliance_profile_data  Original compliance report
 # @param section  Section of the compliance report to normalize
 # @param exceptions  Hash of exceptions to apply
@@ -13,7 +14,10 @@ FileUtils.rm_rf(v1_profiles) if File.directory?(v1_profiles)
 #   - The exceptions for 'documented_missing_parameters' and
 #     'documented_missing_resources' are arrays of strings/regexes to match.
 #   - The exceptions for 'non_compliant' is a Hash in which the key is the
-#     resource and the value is an array of parameter names.
+#     catalog resource and the value is an array of parameter names.
+#
+# @return Normalized compliance report
+#
 def normalize_compliance_results(compliance_profile_data, section, exceptions)
   normalized = Marshal.load(Marshal.dump(compliance_profile_data))
   if section == 'non_compliant'
@@ -61,24 +65,25 @@ describe 'compliance_markup', type: :class do
     'pupmod::master'
   ]
 
+  # regex to match any resource not under test
+  not_expected_classes_regex = Regexp.new(
+    expected_classes.map { |c| "^(?!#{c}(::.*)?)" }.join("|")
+  )
+
   compliance_profiles = {
     'disa_stig'        => {
       :percent_compliant   => 100,
       :exceptions => {
-        'documented_missing_parameters' => [] +
-          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
-        'documented_missing_resources'  => [] +
-          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
+        'documented_missing_parameters' => [ not_expected_classes_regex ],
+        'documented_missing_resources'  => [ not_expected_classes_regex ],
         'non_compliant'                 => {}
       }
     },
     'nist_800_53:rev4' => {
       :percent_compliant   => 99,
       :exceptions => {
-        'documented_missing_parameters' => [] +
-          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
-        'documented_missing_resources'  => [] +
-          expected_classes.map{|c| Regexp.new("^(?!#{c}(::.*)?)")},
+        'documented_missing_parameters' => [ not_expected_classes_regex ],
+        'documented_missing_resources'  => [ not_expected_classes_regex ],
         'non_compliant'                 => {
            # compliance_engine is not smart enough, yet, to allow compliance to
            # be determined by anything other than an exact match to parameter

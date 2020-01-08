@@ -56,7 +56,7 @@ end
 # reporting work.
 describe 'compliance_markup', type: :class do
 
-  # A list of classes that we expect to be included for compliance
+  # A list of classes that we expect to be included for this compliance test.
   #
   # This needs to be well defined since we can also manipulate defined type
   # defaults
@@ -65,9 +65,9 @@ describe 'compliance_markup', type: :class do
     'pupmod::master'
   ]
 
-  # regex to match any resource not under test
+  # regex to match any resource or resource parameter NOT under test
   not_expected_classes_regex = Regexp.new(
-    expected_classes.map { |c| "^(?!#{c}(::.*)?)" }.join("|")
+    "^(?!(#{expected_classes.join("|")})(::.*)?)"
   )
 
   compliance_profiles = {
@@ -141,19 +141,29 @@ describe 'compliance_markup', type: :class do
           # The list of report sections that should not exist and if they do
           # exist, we need to know what is wrong so that we can fix them
           report_validators = [
-            # This should *always* be empty on enforcement
+            # 'non_compliant' specifies resource parameters with values that
+            # don't match what they should be for the security profile, per
+            # the compliance data. This should *always* be empty on enforcement.
             'non_compliant',
-            # If something is set here, either the upstream API changed or you
-            # have a typo in your data
+
+            # 'documented_missing_parameters' are resource parameters that have
+            # been included in the security profile, but don't actually map to
+            # resource parameters found in the catalog.  If something is set
+            # here, either the upstream API changed or you have a typo in your
+            # compliance data.
             'documented_missing_parameters',
-            # If something is set here, you have included enforcement data that
-            # you are not testing so you either need to remove it from your
-            # profile or you need to add the class/defined type for validation
+
+            # 'documented_missing_resources' are catalog resources that have
+            # been included in the security profile, but don't actually map to
+            # resources found in the catalog.  If something is set here, you
+            # have included enforcement data that you are not testing here
+            # (i.e., compliance data for other modules in your fixtures). So,
+            # you either need to remove the corresponding entries from the
+            # compliance results prior to validation, or add the missing
+            # classes/defined types to the manifest used in this test.
             #
-            # Unless this is a completely comprehensive data profile, with all
-            # classes included, this report may be useless and is disabled by
-            # default.
-            #
+            # Unless this test is for a completely comprehensive data profile,
+            # with all classes included, this report section may be useless.
             'documented_missing_resources'
           ]
 
